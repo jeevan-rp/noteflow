@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NoteFlow - AI Text Simplifier & Persona Translator</title>
+  
+  <!-- CDN Scripts as required -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.4.21/mammoth.browser.min.js"></script>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Google Fonts & Material Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              DEFAULT: '#FF6B00',
+              hover: '#E05E00',
+              light: '#FF8533',
+              glow: 'rgba(255, 107, 0, 0.25)'
+            },
+            dark: {
+              bg: '#121212',
+              card: '#1A1A1A',
+              border: '#2A2A2A',
+              input: '#181818'
+            }
+          },
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace']
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Custom Scrollbar & Utility Animations */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #121212;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #2E2E2E;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #FF6B00;
+    }
+
+    .drop-active {
+      border-color: #FF6B00 !important;
+      background-color: rgba(255, 107, 0, 0.08) !important;
+    }
+
+    @keyframes pulse-orange {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(255, 107, 0, 0.4); }
+      50% { box-shadow: 0 0 0 12px rgba(255, 107, 0, 0); }
+    }
+
+    .pulse-ring {
+      animation: pulse-orange 2s infinite;
+    }
+
+    /* Modal Backdrop Blur */
+    .backdrop-blur-custom {
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+  </style>
+</head>
+<body class="bg-dark-bg text-gray-100 font-sans min-h-screen flex flex-col antialiased selection:bg-brand selection:text-white">
+
+  <!-- HEADER -->
+  <header class="border-b border-dark-border bg-dark-bg/95 backdrop-blur-md sticky top-0 z-30 px-4 lg:px-8 py-4 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-brand flex items-center justify-center text-black font-extrabold shadow-lg shadow-brand/20">
+        <span class="material-symbols-outlined text-2xl font-bold">bolt</span>
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="text-xl font-extrabold tracking-tight text-white">NoteFlow</h1>
+          <span class="text-[10px] font-bold uppercase tracking-wider bg-brand/10 text-brand px-2 py-0.5 rounded-full border border-brand/20">AI v2.5</span>
+        </div>
+        <p class="text-xs text-gray-400 hidden sm:block">Simplify complex documents into vivid personas</p>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-3">
+      <div id="keyStatusBadge" class="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-dark-card border border-dark-border text-gray-400">
+        <span id="keyDot" class="w-2 h-2 rounded-full bg-red-500"></span>
+        <span id="keyStatusText">No API Key</span>
+      </div>
+
+      <!-- Gear Icon Button -->
+      <button id="gearBtn" title="API Configuration" class="p-2.5 rounded-xl bg-dark-card border border-dark-border text-gray-300 hover:text-white hover:border-brand hover:bg-brand/10 transition-all flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-brand">
+        <span class="material-symbols-outlined text-xl">settings</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN TWO-COLUMN CONTENT -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 lg:p-8 grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 items-start">
+
+    <!-- LEFT COLUMN: INPUT SECTION -->
+    <section class="flex flex-col gap-5 bg-dark-card border border-dark-border rounded-2xl p-5 lg:p-6 shadow-xl">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span class="material-symbols-outlined text-brand">description</span>
+          <h2 class="text-base font-bold text-white tracking-wide">Input Source</h2>
+        </div>
+        <span id="fileStatus" class="text-xs text-gray-400 font-medium">Supported: .pdf, .docx, .txt</span>
+      </div>
+
+      <!-- DRAG AND DROP ZONE -->
+      <div id="dropZone" class="border-2 border-dashed border-dark-border hover:border-brand/60 rounded-xl p-6 text-center bg-dark-input/50 transition-all cursor-pointer flex flex-col items-center justify-center gap-3 group">
+        <div class="w-12 h-12 rounded-full bg-dark-card border border-dark-border flex items-center justify-center group-hover:scale-110 group-hover:border-brand group-hover:text-brand text-gray-400 transition-all">
+          <span class="material-symbols-outlined text-2xl">cloud_upload</span>
+        </div>
+        <div>
+          <p class="text-sm font-semibold text-gray-200">
+            Drag & drop your file here, or <span class="text-brand underline decoration-brand/40 underline-offset-4 group-hover:decoration-brand">browse</span>
+          </p>
+          <p class="text-xs text-gray-500 mt-1">Upload PDF or Word files to extract text automatically</p>
+        </div>
+        <input type="file" id="fileInput" accept=".pdf,.docx,.txt" class="hidden" />
+      </div>
+
+      <!-- TEXTAREA -->
+      <div class="flex flex-col gap-2">
+        <div class="flex justify-between items-center text-xs text-gray-400">
+          <label for="inputText" class="font-semibold text-gray-300">Text Content</label>
+          <div class="flex items-center gap-3">
+            <span id="charCount" class="font-mono text-gray-500">0 chars</span>
+            <button id="clearTextBtn" class="text-gray-400 hover:text-red-400 transition-colors hidden flex items-center gap-1">
+              <span class="material-symbols-outlined text-sm">delete</span> Clear
+            </button>
+          </div>
+        </div>
+        <textarea id="inputText" rows="9" placeholder="Paste your complex article, document, meeting notes, or text here..." class="w-full bg-dark-input border border-dark-border rounded-xl p-4 text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand transition-all resize-y leading-relaxed font-sans"></textarea>
+      </div>
+
+      <!-- PERSONA SELECTOR -->
+      <div class="flex flex-col gap-2">
+        <label for="personaSelect" class="text-xs font-semibold text-gray-300 flex items-center justify-between">
+          <span>Target Persona Style</span>
+          <span class="text-gray-500 text-[11px] font-normal">Choose tone & personality</span>
+        </label>
+        <div class="relative">
+          <select id="personaSelect" class="w-full bg-dark-input border border-dark-border text-white text-sm rounded-xl p-3.5 pr-10 appearance-none focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand cursor-pointer font-medium">
+            <option value="Normal">✨ Normal - Clear, Simple & Professional</option>
+            <option value="GenZ Slang">🔥 GenZ Slang - Main Character Energy, Fr Fr</option>
+            <option value="Meme">🤡 Meme - Internet Culture & Chaotic Energy</option>
+            <option value="Minecraft">⛏️ Minecraft - Blocky Crafting Terminology</option>
+            <option value="Pirate">🏴‍☠️ Pirate - Swashbuckling Ahoy Speak</option>
+            <option value="Shakespeare">🎭 Shakespeare - Poetic Renaissance Bard</option>
+            <option value="ELI5">👶 ELI5 - Simple Everyday Analogies & Basic Words</option>
+            <option value="RPG Quest">⚔️ RPG Quest - Epic Quest Log & Boss Weaknesses</option>
+            <option value="Anime">⚡ Anime - Shonen Hype & Secret Power-Up Techniques</option>
+            <option value="Corporate">💼 Corporate - Executive Buzzwords & Slide Summaries</option>
+            <option value="Chef">👨‍🍳 Chef - Recipe Ingredients & Cooking Steps</option>
+          </select>
+          <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-400">
+            <span class="material-symbols-outlined">unfold_more</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- SIMPLIFY BUTTON -->
+      <button id="simplifyBtn" class="w-full bg-brand hover:bg-brand-hover text-black font-extrabold text-base tracking-wide py-4 px-6 rounded-xl transition-all shadow-lg shadow-brand/20 hover:shadow-brand/40 active:scale-[0.99] flex items-center justify-center gap-2 group mt-2 focus:outline-none focus:ring-2 focus:ring-brand focus:ring-offset-2 focus:ring-offset-dark-bg">
+        <span id="btnSpinner" class="hidden animate-spin h-5 w-5 border-2 border-black border-t-transparent rounded-full"></span>
+        <span id="btnIcon" class="material-symbols-outlined font-bold group-hover:rotate-12 transition-transform">auto_awesome</span>
+        <span id="btnText">Simplify Text</span>
+      </button>
+
+      <!-- ERROR BANNER -->
+      <div id="inputError" class="hidden p-3.5 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-xs flex items-center gap-2">
+        <span class="material-symbols-outlined text-sm shrink-0">error</span>
+        <span id="inputErrorMsg">Please enter text or upload a file first.</span>
+      </div>
+    </section>
+
+    <!-- RIGHT COLUMN: OUTPUT SECTION -->
+    <section class="flex flex-col gap-5 bg-dark-card border border-dark-border rounded-2xl p-5 lg:p-6 shadow-xl h-full">
+      <div class="flex items-center justify-between border-b border-dark-border/60 pb-3">
+        <div class="flex items-center gap-2">
+          <span class="material-symbols-outlined text-brand">output</span>
+          <h2 class="text-base font-bold text-white tracking-wide">Simplified Result</h2>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button id="copyBtn" title="Copy to Clipboard" disabled class="px-3 py-1.5 rounded-lg bg-dark-input border border-dark-border text-xs font-semibold text-gray-400 hover:text-white hover:border-brand disabled:opacity-40 disabled:hover:border-dark-border disabled:hover:text-gray-400 transition-all flex items-center gap-1.5 focus:outline-none focus:ring-1 focus:ring-brand">
+            <span id="copyIcon" class="material-symbols-outlined text-sm">content_copy</span>
+            <span id="copyText">Copy</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- OUTPUT DISPLAY AREA -->
+      <div class="relative flex-1 min-h-[360px] lg:min-h-[460px] bg-dark-input border border-dark-border rounded-xl p-5 overflow-y-auto font-sans leading-relaxed text-sm text-gray-200">
+        
+        <!-- INITIAL EMPTY STATE -->
+        <div id="outputPlaceholder" class="absolute inset-0 flex flex-col items-center justify-center text-center p-6 text-gray-500 gap-3">
+          <div class="w-14 h-14 rounded-2xl bg-dark-card border border-dark-border flex items-center justify-center text-gray-600">
+            <span class="material-symbols-outlined text-3xl">chat_bubble_outline</span>
+          </div>
+          <div>
+            <p class="font-semibold text-gray-400">Ready for transformation</p>
+            <p class="text-xs text-gray-600 mt-1 max-w-xs">Enter your text on the left, select a persona, and hit 'Simplify Text'</p>
+          </div>
+        </div>
+
+        <!-- LOADING SKELETON -->
+        <div id="outputSkeleton" class="hidden space-y-3 animate-pulse py-2">
+          <div class="h-4 bg-dark-border/80 rounded w-3/4"></div>
+          <div class="h-4 bg-dark-border/80 rounded w-11/12"></div>
+          <div class="h-4 bg-dark-border/80 rounded w-5/6"></div>
+          <div class="h-4 bg-dark-border/80 rounded w-2/3"></div>
+          <div class="h-4 bg-dark-border/80 rounded w-4/5"></div>
+        </div>
+
+        <!-- ACTUAL RESULT TEXT -->
+        <div id="outputText" class="hidden whitespace-pre-wrap font-normal text-gray-100 leading-relaxed text-base"></div>
+      </div>
+
+      <!-- FOOTER STATS IN OUTPUT CARD -->
+      <div class="flex items-center justify-between text-xs text-gray-500 pt-1">
+        <span id="activePersonaBadge" class="font-medium text-gray-400">Persona: <strong class="text-brand font-semibold" id="activePersonaText">Normal</strong></span>
+        <span id="resultMeta" class="font-mono text-gray-600">0 words</span>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- MODAL OVERLAY: API CONFIGURATION -->
+  <div id="apiModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-custom hidden transition-opacity">
+    <div class="bg-dark-card border border-dark-border rounded-2xl p-6 max-w-md w-full shadow-2xl relative transform transition-all border-t-2 border-t-brand">
+      
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between border-b border-dark-border pb-4 mb-4">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-lg bg-brand/10 border border-brand/30 flex items-center justify-center text-brand">
+            <span class="material-symbols-outlined text-lg">key</span>
+          </div>
+          <h3 class="text-lg font-bold text-white">API Configuration</h3>
+        </div>
+        <button id="closeModalBtn" class="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-dark-input transition-colors">
+          <span class="material-symbols-outlined text-xl">close</span>
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="space-y-4">
+        <p class="text-xs text-gray-400 leading-relaxed">
+          NoteFlow relies on Google's Gemini API to process and simplify text. Your API key is stored locally in your browser's <code class="bg-dark-input px-1.5 py-0.5 rounded text-brand font-mono">localStorage</code> and is never transmitted to any third-party server.
+        </p>
+
+        <div class="space-y-1.5">
+          <label for="apiKeyInput" class="text-xs font-semibold text-gray-300 block">Gemini API Key</label>
+          <div class="relative">
+            <input type="password" id="apiKeyInput" placeholder="AIzaSy..." class="w-full bg-dark-input border border-dark-border rounded-xl p-3 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand font-mono pr-10" />
+            <button id="togglePasswordBtn" type="button" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-gray-300">
+              <span class="material-symbols-outlined text-lg">visibility</span>
+            </button>
+          </div>
+          <p class="text-[11px] text-gray-500">Need a key? Get one free from <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-brand hover:underline font-medium">Google AI Studio</a>.</p>
+        </div>
+
+        <div id="modalAlert" class="hidden p-3 rounded-lg text-xs font-medium"></div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-dark-border">
+        <button id="clearKeyBtn" type="button" class="px-4 py-2.5 rounded-xl border border-dark-border text-xs font-semibold text-gray-400 hover:text-red-400 hover:border-red-500/40 transition-colors">
+          Remove Key
+        </button>
+        <button id="saveKeyBtn" type="button" class="px-5 py-2.5 rounded-xl bg-brand hover:bg-brand-hover text-black font-extrabold text-xs uppercase tracking-wider transition-all shadow-md shadow-brand/20 active:scale-95">
+          Save Settings
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- JAVASCRIPT LOGIC -->
+  <script>
+    // Initialize PDF.js worker
+    if (window.pdfjsLib) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+    }
+
+    // PERSONA SYSTEM INSTRUCTIONS
+    function getSystemInstruction(persona) {
+      const instructions = {
+        'Normal': "You are an expert tutor. Simplify the text into clear bullet points and summary sentences.",
+        'GenZ Slang': "You are a GenZ teen. Rewrite using heavy GenZ slang (no cap, bet, fr fr, cooked) while keeping core facts accurate.",
+        'Meme': "You communicate entirely in internet meme formats and tropes.",
+        'Minecraft': "Translate key concepts using Minecraft analogies (crafting, redstone, mob mechanics).",
+        'Pirate': "Rewrite as a 17th-century pirate captain giving instructions to the crew.",
+        'Shakespeare': "Translate into dramatic Early Modern English using iambic pentameter and metaphors.",
+        // New Personas
+        'ELI5': "You are an ELI5 tutor. Explain using simple everyday analogies, basic vocabulary, and no jargon.",
+        'RPG Quest': "Structure the text as an epic RPG quest log with Main Objectives, Loot/Rewards, and Boss Weaknesses.",
+        'Anime': "Explain with extreme Shonen anime hype, treating facts as secret power-up techniques.",
+        'Corporate': "Translate the text using corporate buzzwords (synergy, paradigm shift) as an executive slide summary.",
+        'Chef': "Structure the notes as a recipe with Ingredients (core terms) and Cooking Steps (processes)."
+      };
+
+      return instructions[persona] || instructions['Normal'];
+    }
+
+    // DOM ELEMENTS
+    const gearBtn = document.getElementById('gearBtn');
+    const apiModal = document.getElementById('apiModal');
+    const closeModalBtn = document.getElementById('closeModalBtn');
+    const apiKeyInput = document.getElementById('apiKeyInput');
+    const togglePasswordBtn = document.getElementById('togglePasswordBtn');
+    const saveKeyBtn = document.getElementById('saveKeyBtn');
+    const clearKeyBtn = document.getElementById('clearKeyBtn');
+    const modalAlert = document.getElementById('modalAlert');
+
+    const keyStatusBadge = document.getElementById('keyStatusBadge');
+    const keyDot = document.getElementById('keyDot');
+    const keyStatusText = document.getElementById('keyStatusText');
+
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const fileStatus = document.getElementById('fileStatus');
+
+    const inputText = document.getElementById('inputText');
+    const charCount = document.getElementById('charCount');
+    const clearTextBtn = document.getElementById('clearTextBtn');
+    const personaSelect = document.getElementById('personaSelect');
+
+    const simplifyBtn = document.getElementById('simplifyBtn');
+    const btnSpinner = document.getElementById('btnSpinner');
+    const btnIcon = document.getElementById('btnIcon');
+    const btnText = document.getElementById('btnText');
+    const inputError = document.getElementById('inputError');
+    const inputErrorMsg = document.getElementById('inputErrorMsg');
+
+    const copyBtn = document.getElementById('copyBtn');
+    const copyIcon = document.getElementById('copyIcon');
+    const copyText = document.getElementById('copyText');
+
+    const outputPlaceholder = document.getElementById('outputPlaceholder');
+    const outputSkeleton = document.getElementById('outputSkeleton');
+    const outputText = document.getElementById('outputText');
+    const activePersonaText = document.getElementById('activePersonaText');
+    const resultMeta = document.getElementById('resultMeta');
+
+    // STATE
+    let currentApiKey = localStorage.getItem('gemini_api_key') || '';
+    let hasServerApiKey = false;
+
+    // Check Server API Config on load
+    async function checkServerConfig() {
+      try {
+        const res = await fetch('/api/config');
+        if (res.ok) {
+          const data = await res.json();
+          hasServerApiKey = !!data.hasServerKey;
+        }
+      } catch (e) {
+        console.warn('Could not connect to /api/config server endpoint:', e);
+      }
+      updateKeyStatusUI();
+    }
+
+    // INITIALIZATION
+    checkServerConfig();
+
+    // MODAL HANDLERS
+    gearBtn.addEventListener('click', () => {
+      apiKeyInput.value = currentApiKey;
+      hideModalAlert();
+      apiModal.classList.remove('hidden');
+    });
+
+    closeModalBtn.addEventListener('click', () => {
+      apiModal.classList.add('hidden');
+    });
+
+    apiModal.addEventListener('click', (e) => {
+      if (e.target === apiModal) {
+        apiModal.classList.add('hidden');
+      }
+    });
+
+    togglePasswordBtn.addEventListener('click', () => {
+      const type = apiKeyInput.type === 'password' ? 'text' : 'password';
+      apiKeyInput.type = type;
+      togglePasswordBtn.querySelector('span').textContent = type === 'password' ? 'visibility' : 'visibility_off';
+    });
+
+    saveKeyBtn.addEventListener('click', () => {
+      const keyVal = apiKeyInput.value.trim();
+      currentApiKey = keyVal;
+      if (keyVal) {
+        localStorage.setItem('gemini_api_key', keyVal);
+        showModalAlert('Custom API Key saved successfully!', 'success');
+      } else {
+        localStorage.removeItem('gemini_api_key');
+        showModalAlert('Custom key cleared. Using system default key if available.', 'info');
+      }
+      updateKeyStatusUI();
+      setTimeout(() => {
+        apiModal.classList.add('hidden');
+      }, 800);
+    });
+
+    clearKeyBtn.addEventListener('click', () => {
+      currentApiKey = '';
+      localStorage.removeItem('gemini_api_key');
+      apiKeyInput.value = '';
+      updateKeyStatusUI();
+      showModalAlert('Custom API Key removed.', 'info');
+    });
+
+    function showModalAlert(msg, type) {
+      modalAlert.textContent = msg;
+      modalAlert.className = 'p-3 rounded-lg text-xs font-medium ';
+      if (type === 'error') {
+        modalAlert.classList.add('bg-red-500/10', 'text-red-400', 'border', 'border-red-500/30');
+      } else if (type === 'success') {
+        modalAlert.classList.add('bg-emerald-500/10', 'text-emerald-400', 'border', 'border-emerald-500/30');
+      } else {
+        modalAlert.classList.add('bg-gray-500/10', 'text-gray-300', 'border', 'border-gray-500/30');
+      }
+      modalAlert.classList.remove('hidden');
+    }
+
+    function hideModalAlert() {
+      modalAlert.classList.add('hidden');
+    }
+
+    function updateKeyStatusUI() {
+      if (currentApiKey) {
+        keyDot.className = 'w-2 h-2 rounded-full bg-emerald-500';
+        keyStatusText.textContent = 'Custom API Key Active';
+      } else if (hasServerApiKey) {
+        keyDot.className = 'w-2 h-2 rounded-full bg-emerald-500';
+        keyStatusText.textContent = 'System Gemini API Active';
+      } else {
+        keyDot.className = 'w-2 h-2 rounded-full bg-red-500';
+        keyStatusText.textContent = 'No API Key Set';
+      }
+    }
+
+    // TEXTAREA EVENTS
+    inputText.addEventListener('input', () => {
+      const length = inputText.value.length;
+      charCount.textContent = `${length.toLocaleString()} chars`;
+      if (length > 0) {
+        clearTextBtn.classList.remove('hidden');
+        hideInputError();
+      } else {
+        clearTextBtn.classList.add('hidden');
+      }
+    });
+
+    clearTextBtn.addEventListener('click', () => {
+      inputText.value = '';
+      charCount.textContent = '0 chars';
+      clearTextBtn.classList.add('hidden');
+      fileStatus.textContent = 'Supported: .pdf, .docx, .txt';
+    });
+
+    personaSelect.addEventListener('change', () => {
+      activePersonaText.textContent = personaSelect.value;
+    });
+
+    // FILE UPLOAD AND DRAG-AND-DROP
+    dropZone.addEventListener('click', () => fileInput.click());
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+      dropZone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropZone.classList.add('drop-active');
+      }, false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+      dropZone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropZone.classList.remove('drop-active');
+      }, false);
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+      const dt = e.dataTransfer;
+      const files = dt.files;
+      if (files && files.length > 0) {
+        processFile(files[0]);
+      }
+    });
+
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files.length > 0) {
+        processFile(e.target.files[0]);
+      }
+    });
+
+    async function processFile(file) {
+      const name = file.name;
+      const ext = name.split('.').pop().toLowerCase();
+      fileStatus.textContent = `Reading ${name}...`;
+
+      try {
+        let extracted = '';
+        if (ext === 'pdf') {
+          extracted = await parsePdf(file);
+        } else if (ext === 'docx') {
+          extracted = await parseDocx(file);
+        } else if (ext === 'txt') {
+          extracted = await file.text();
+        } else {
+          showInputError('Unsupported file format. Please upload a .pdf, .docx, or .txt file.');
+          fileStatus.textContent = 'Supported: .pdf, .docx, .txt';
+          return;
+        }
+
+        if (extracted && extracted.trim()) {
+          inputText.value = extracted.trim();
+          inputText.dispatchEvent(new Event('input'));
+          fileStatus.textContent = `Loaded: ${name}`;
+          hideInputError();
+        } else {
+          showInputError('No readable text could be extracted from this file.');
+          fileStatus.textContent = 'Supported: .pdf, .docx, .txt';
+        }
+      } catch (err) {
+        console.error('File parsing error:', err);
+        showInputError(`Failed to parse file: ${err.message || 'Unknown error'}`);
+        fileStatus.textContent = 'Supported: .pdf, .docx, .txt';
+      }
+    }
+
+    async function parsePdf(file) {
+      const arrayBuffer = await file.arrayBuffer();
+      const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+      const pdf = await loadingTask.promise;
+      let fullText = '';
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items.map(item => item.str).join(' ');
+        fullText += pageText + '\n\n';
+      }
+      return fullText;
+    }
+
+    async function parseDocx(file) {
+      const arrayBuffer = await file.arrayBuffer();
+      const result = await mammoth.extractRawText({ arrayBuffer: arrayBuffer });
+      return result.value;
+    }
+
+    function showInputError(msg) {
+      inputErrorMsg.textContent = msg;
+      inputError.classList.remove('hidden');
+    }
+
+    function hideInputError() {
+      inputError.classList.add('hidden');
+    }
+
+    // GEMINI API SIMPLIFY PROCESS
+    simplifyBtn.addEventListener('click', async () => {
+      hideInputError();
+
+      // Check API Key availability (custom key or server key)
+      if (!currentApiKey && !hasServerApiKey) {
+        apiKeyInput.value = '';
+        showModalAlert('No Gemini API Key found! Please enter your Gemini API key below or configure server secrets.', 'error');
+        apiModal.classList.remove('hidden');
+        return;
+      }
+
+      // Check Input Text
+      const userText = inputText.value.trim();
+      if (!userText) {
+        showInputError('Please enter or upload some text before simplifying.');
+        inputText.focus();
+        return;
+      }
+
+      const selectedPersona = personaSelect.value;
+      const systemInstruction = getSystemInstruction(selectedPersona);
+
+      // UI Loading State
+      setLoadingState(true);
+
+      try {
+        const generatedText = await callGeminiAPI(currentApiKey, userText, systemInstruction);
+
+        // Display Output
+        renderOutput(generatedText);
+
+      } catch (err) {
+        console.error('Gemini API Error:', err);
+        showInputError(`API Error: ${err.message || 'Failed to generate simplified text.'}`);
+        resetOutputToEmpty();
+      } finally {
+        setLoadingState(false);
+      }
+    });
+
+    async function callGeminiAPI(apiKey, promptText, systemInstruction) {
+      // 1. Try server backend route first
+      try {
+        const serverRes = await fetch('/api/simplify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: promptText,
+            systemInstruction: systemInstruction,
+            apiKey: apiKey || undefined
+          })
+        });
+
+        if (serverRes.ok) {
+          const data = await serverRes.json();
+          if (data.text) return data.text;
+        } else {
+          const errData = await serverRes.json().catch(() => ({}));
+          if (errData.error?.message && !apiKey) {
+            throw new Error(errData.error.message);
+          }
+        }
+      } catch (err) {
+        if (!apiKey) throw err;
+        console.warn('Server API call failed, attempting client direct fetch...', err);
+      }
+
+      // 2. Direct client fetch fallback (if apiKey is provided in localStorage)
+      if (apiKey) {
+        const primaryUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+        const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+
+        const payload = {
+          system_instruction: {
+            parts: [{ text: systemInstruction }]
+          },
+          contents: [
+            {
+              parts: [{ text: promptText }]
+            }
+          ],
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 2048
+          }
+        };
+
+        let response = await fetch(primaryUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (!response.ok && (response.status === 404 || response.status === 400)) {
+          const errorData = await response.json().catch(() => ({}));
+          if (errorData.error?.message?.includes('not found') || response.status === 404) {
+            response = await fetch(fallbackUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            });
+          } else {
+            throw new Error(errorData.error?.message || `API request failed with status ${response.status}`);
+          }
+        }
+
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.error?.message || `HTTP ${response.status}: API request failed.`);
+        }
+
+        const data = await response.json();
+        if (data.error) {
+          throw new Error(data.error.message || 'API call returned an error.');
+        }
+
+        const candidateText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!candidateText) {
+          throw new Error('No generated text received from Gemini API.');
+        }
+
+        return candidateText;
+      }
+
+      throw new Error('Unable to complete request. Please check your Gemini API key in settings.');
+    }
+
+    function setLoadingState(isLoading) {
+      if (isLoading) {
+        simplifyBtn.disabled = true;
+        btnSpinner.classList.remove('hidden');
+        btnIcon.classList.add('hidden');
+        btnText.textContent = 'Processing...';
+
+        outputPlaceholder.classList.add('hidden');
+        outputText.classList.add('hidden');
+        outputSkeleton.classList.remove('hidden');
+        copyBtn.disabled = true;
+      } else {
+        simplifyBtn.disabled = false;
+        btnSpinner.classList.add('hidden');
+        btnIcon.classList.remove('hidden');
+        btnText.textContent = 'Simplify Text';
+      }
+    }
+
+    function renderOutput(text) {
+      outputPlaceholder.classList.add('hidden');
+      outputSkeleton.classList.add('hidden');
+      outputText.textContent = text;
+      outputText.classList.remove('hidden');
+
+      copyBtn.disabled = false;
+
+      // Word count stat
+      const words = text.trim().split(/\s+/).filter(Boolean).length;
+      resultMeta.textContent = `${words.toLocaleString()} words`;
+    }
+
+    function resetOutputToEmpty() {
+      outputSkeleton.classList.add('hidden');
+      outputText.classList.add('hidden');
+      outputPlaceholder.classList.remove('hidden');
+      copyBtn.disabled = true;
+      resultMeta.textContent = '0 words';
+    }
+
+    // COPY TO CLIPBOARD
+    copyBtn.addEventListener('click', () => {
+      const textToCopy = outputText.textContent;
+      if (!textToCopy) return;
+
+      navigator.clipboard.writeText(textToCopy).then(() => {
+        copyIcon.textContent = 'check';
+        copyText.textContent = 'Copied!';
+        copyBtn.classList.add('text-brand', 'border-brand');
+
+        setTimeout(() => {
+          copyIcon.textContent = 'content_copy';
+          copyText.textContent = 'Copy';
+          copyBtn.classList.remove('text-brand', 'border-brand');
+        }, 2000);
+      }).catch(err => {
+        console.error('Copy failed:', err);
+      });
+    });
+  </script>
+</body>
+</html>

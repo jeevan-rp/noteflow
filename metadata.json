@@ -1,0 +1,6 @@
+{
+  "name": "NoteFlow",
+  "description": "A sleek SaaS application for simplifying and rephrasing text into distinct personas using Gemini AI.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
